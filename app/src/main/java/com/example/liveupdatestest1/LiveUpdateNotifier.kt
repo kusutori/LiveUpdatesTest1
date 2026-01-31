@@ -3,16 +3,21 @@ package com.example.liveupdatestest1
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 
 const val LIVE_UPDATE_CHANNEL_ID = "live_updates"
 const val LIVE_UPDATE_NOTIFICATION_ID = 1001
 const val SEGMENTED_NOTIFICATION_ID = 1002
 const val TRAVEL_NOTIFICATION_ID = 1003
+const val PICKUP_CODE_NOTIFICATION_ID = 1004
+const val COUNTDOWN_NOTIFICATION_ID = 1005
 
 fun ensureLiveUpdateChannel(context: Context) {
     val manager = context.getSystemService(NotificationManager::class.java)
@@ -274,4 +279,139 @@ fun postTrainLiveUpdate(
 fun cancelTravelLiveUpdate(context: Context) {
     val manager = context.getSystemService(NotificationManager::class.java)
     manager.cancel(TRAVEL_NOTIFICATION_ID)
+}
+
+/**
+ * 取餐码通知 - 使用 BigTextStyle 而非 ProgressStyle
+ * 这是一个没有进度条的实时通知，只有状态文字和操作按钮
+ * 典型场景：取餐码、登机牌、入场二维码等
+ * 
+ * @param pickupCode 取餐码
+ * @param storeName 店铺名称
+ * @param statusText 状态描述
+ */
+fun postPickupCodeLiveUpdate(
+    context: Context,
+    pickupCode: String,
+    storeName: String,
+    statusText: String
+) {
+    ensureLiveUpdateChannel(context)
+
+    // 创建"已取餐"操作按钮的 PendingIntent
+    // 实际应用中应该指向一个 BroadcastReceiver 来处理这个动作
+    val pickupIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_PICKED_UP"
+        putExtra("pickup_code", pickupCode)
+    }
+    val pickupPendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        pickupIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val builder = Notification.Builder(context, LIVE_UPDATE_CHANNEL_ID)
+        .setSmallIcon(R.mipmap.ic_launcher)
+        .setContentTitle("$storeName - 取餐码 $pickupCode")
+        .setContentText(statusText)
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
+        .setCategory(Notification.CATEGORY_STATUS)
+        // 添加大图标（可以是店铺Logo或二维码）
+        .setLargeIcon(Icon.createWithResource(context, R.drawable.ic_qrcode))
+        // 添加操作按钮
+        .addAction(
+            Notification.Action.Builder(
+                Icon.createWithResource(context, R.drawable.ic_check),
+                "已取餐",
+                pickupPendingIntent
+            ).build()
+        )
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+        // 使用 BigTextStyle 而不是 ProgressStyle
+        // 实时通知支持: 标准样式, BigTextStyle, CallStyle, ProgressStyle
+        val style = Notification.BigTextStyle()
+            .bigText("取餐码: $pickupCode\n$statusText\n\n请在柜台出示此码取餐")
+            .setBigContentTitle(storeName)
+            .setSummaryText("等待取餐")
+
+        builder.setStyle(style)
+        
+        // 请求提升为实时通知
+        val extras = Bundle()
+        extras.putBoolean("android.requestPromotedOngoing", true)
+        builder.addExtras(extras)
+        
+        // 状态chip显示取餐码
+        builder.setShortCriticalText(pickupCode)
+    } else {
+        builder.setStyle(
+            Notification.BigTextStyle()
+                .bigText("取餐码: $pickupCode\n$statusText\n\n请在柜台出示此码取餐")
+        )
+    }
+
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.notify(PICKUP_CODE_NOTIFICATION_ID, builder.build())
+}
+
+fun cancelPickupCodeLiveUpdate(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.cancel(PICKUP_CODE_NOTIFICATION_ID)
+}
+
+/**
+ * 倒计时通知 - 使用 setWhen + chronometer
+ * 适用于：预约时间提醒、限时优惠、演唱会开场倒计时等
+ * 
+ * @param targetTimeMillis 目标时间（毫秒时间戳）
+ * @param title 标题
+ * @param statusText 状态描述
+ */
+fun postCountdownLiveUpdate(
+    context: Context,
+    targetTimeMillis: Long,
+    title: String,
+    statusText: String
+) {
+    ensureLiveUpdateChannel(context)
+
+    val builder = Notification.Builder(context, LIVE_UPDATE_CHANNEL_ID)
+        .setSmallIcon(R.drawable.ic_timer)
+        .setContentTitle(title)
+        .setContentText(statusText)
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
+        .setCategory(Notification.CATEGORY_EVENT)
+        // 设置目标时间，使用倒计时模式
+        .setWhen(targetTimeMillis)
+        .setShowWhen(true)
+        .setUsesChronometer(true)
+        .setChronometerCountDown(true)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+        // 使用 BigTextStyle
+        val style = Notification.BigTextStyle()
+            .bigText(statusText)
+            .setBigContentTitle(title)
+
+        builder.setStyle(style)
+        
+        // 请求提升为实时通知
+        val extras = Bundle()
+        extras.putBoolean("android.requestPromotedOngoing", true)
+        builder.addExtras(extras)
+        
+        // chip 会自动显示倒计时时间
+    }
+
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.notify(COUNTDOWN_NOTIFICATION_ID, builder.build())
+}
+
+fun cancelCountdownLiveUpdate(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.cancel(COUNTDOWN_NOTIFICATION_ID)
 }

@@ -269,8 +269,81 @@ fun LiveUpdatesScreen(modifier: Modifier = Modifier) {
             Text(text = "结束火车通知")
         }
 
+        HorizontalDivider()
+
+        // === 取餐码通知（无进度条，BigTextStyle + 按钮） ===
+        Text(text = "🎫 取餐码通知（无进度条）")
+        Text(text = "使用 BigTextStyle + 操作按钮")
+
+        Button(onClick = {
+            postPickupCodeLiveUpdate(
+                context,
+                pickupCode = "A086",
+                storeName = "星巴克咖啡(国贸店)",
+                statusText = "您的饮品已制作完成，请到吧台取餐"
+            )
+        }) {
+            Text(text = "显示取餐码")
+        }
+
+        Button(onClick = {
+            postPickupCodeLiveUpdate(
+                context,
+                pickupCode = "B123",
+                storeName = "麦当劳(三里屯店)",
+                statusText = "您的餐品正在制作中，预计3分钟完成"
+            )
+        }) {
+            Text(text = "显示另一个取餐码")
+        }
+
+        Button(onClick = {
+            cancelPickupCodeLiveUpdate(context)
+        }) {
+            Text(text = "取消取餐码通知")
+        }
+
+        HorizontalDivider()
+
+        // === 倒计时通知（使用 chronometer） ===
+        Text(text = "⏱️ 倒计时通知")
+        Text(text = "使用 setUsesChronometer + setChronometerCountDown")
+
+        Button(onClick = {
+            // 设置5分钟后的时间
+            val targetTime = System.currentTimeMillis() + 5 * 60 * 1000
+            postCountdownLiveUpdate(
+                context,
+                targetTimeMillis = targetTime,
+                title = "演唱会即将开始",
+                statusText = "周杰伦2025巡回演唱会 · 北京站\n请提前入场，演出即将开始"
+            )
+        }) {
+            Text(text = "开始5分钟倒计时")
+        }
+
+        Button(onClick = {
+            // 设置30秒后的时间
+            val targetTime = System.currentTimeMillis() + 30 * 1000
+            postCountdownLiveUpdate(
+                context,
+                targetTimeMillis = targetTime,
+                title = "限时优惠即将结束",
+                statusText = "您的专属优惠券即将过期，快去下单！"
+            )
+        }) {
+            Text(text = "开始30秒倒计时")
+        }
+
+        Button(onClick = {
+            cancelCountdownLiveUpdate(context)
+        }) {
+            Text(text = "取消倒计时通知")
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = "提示：Android 16 上会以 Live Updates 方式展示，分段通知会显示不同颜色的进度条。")
+        Text(text = "新增：取餐码使用 BigTextStyle（无进度条），倒计时使用 chronometer。")
     }
 }
 

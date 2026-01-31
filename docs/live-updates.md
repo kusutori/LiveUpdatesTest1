@@ -163,6 +163,120 @@ for (i in 1 until stations.size - 1) {
 - 提醒、日历事件
 - 应用功能快捷方式
 
+---
+
+## 无进度条的实时通知
+
+### 5. 取餐码/登机牌通知（BigTextStyle + 操作按钮）
+适用于：取餐码、登机牌、入场二维码、快递取件码
+
+实时通知**不仅限于 ProgressStyle**，也支持 `BigTextStyle` 和 `CallStyle`！
+
+```kotlin
+val builder = Notification.Builder(context, CHANNEL_ID)
+    .setSmallIcon(R.mipmap.ic_launcher)
+    .setContentTitle("星巴克咖啡 - 取餐码 A086")
+    .setContentText("您的饮品已制作完成")
+    .setOngoing(true)
+    .setOnlyAlertOnce(true)
+    // 大图标（店铺Logo或二维码）
+    .setLargeIcon(Icon.createWithResource(context, R.drawable.ic_qrcode))
+    // 操作按钮
+    .addAction(
+        Notification.Action.Builder(
+            Icon.createWithResource(context, R.drawable.ic_check),
+            "已取餐",
+            pickupPendingIntent
+        ).build()
+    )
+
+// 使用 BigTextStyle
+val style = Notification.BigTextStyle()
+    .bigText("取餐码: A086\n您的饮品已制作完成\n\n请在柜台出示此码取餐")
+    .setBigContentTitle("星巴克咖啡")
+    .setSummaryText("等待取餐")
+
+builder.setStyle(style)
+
+// 请求提升
+val extras = Bundle()
+extras.putBoolean("android.requestPromotedOngoing", true)
+builder.addExtras(extras)
+
+// 状态chip显示取餐码
+builder.setShortCriticalText("A086")
+```
+
+### 6. 倒计时通知（Chronometer）
+适用于：演唱会开场倒计时、限时优惠、预约时间
+
+```kotlin
+val targetTime = System.currentTimeMillis() + 5 * 60 * 1000  // 5分钟后
+
+val builder = Notification.Builder(context, CHANNEL_ID)
+    .setSmallIcon(R.drawable.ic_timer)
+    .setContentTitle("演唱会即将开始")
+    .setContentText("请提前入场")
+    .setOngoing(true)
+    .setOnlyAlertOnce(true)
+    // 设置目标时间和倒计时模式
+    .setWhen(targetTime)
+    .setShowWhen(true)
+    .setUsesChronometer(true)        // 使用计时器
+    .setChronometerCountDown(true)   // 倒计时模式
+
+// 状态chip会自动显示倒计时时间
+```
+
+---
+
+## 其他重要 API
+
+### 操作按钮 (Action)
+```kotlin
+// 最多3个操作按钮
+builder.addAction(
+    Notification.Action.Builder(
+        Icon.createWithResource(context, R.drawable.ic_action),
+        "按钮文字",
+        pendingIntent
+    ).build()
+)
+```
+
+### 大图标 (Large Icon)
+```kotlin
+builder.setLargeIcon(Icon.createWithResource(context, R.drawable.ic_large))
+// 或从 Bitmap
+builder.setLargeIcon(Icon.createWithBitmap(bitmap))
+```
+
+### 状态 Chip (Short Critical Text)
+```kotlin
+// 在状态栏显示简短信息（最多7个字符效果最佳）
+builder.setShortCriticalText("A086")
+```
+
+### 删除监听 (Delete Intent)
+```kotlin
+// 检测用户关闭通知
+builder.setDeleteIntent(deletePendingIntent)
+```
+
+### 检测提升状态
+```kotlin
+// 检查通知是否已被提升
+notification.flags and Notification.FLAG_PROMOTED_ONGOING != 0
+
+// 验证通知是否具备提升资格
+notification.hasPromotableCharacteristics()
+
+// 检查应用是否可以发布推广通知
+notificationManager.canPostPromotedNotifications()
+```
+
+---
+
 ## 注意事项
 
 1. 不要频繁发布用户不需要的实时更新，用户可在系统设置中禁用
