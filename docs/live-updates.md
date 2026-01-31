@@ -284,6 +284,100 @@ notificationManager.canPostPromotedNotifications()
 3. 不要重新发布用户已关闭的通知
 4. 低版本 Android 需要回退到普通进度条：`builder.setProgress(max, progress, false)`
 
+---
+
+## CallStyle 通话通知
+
+实时通知支持的另一种样式，专门用于语音/视频通话。
+
+```kotlin
+// 创建来电者 Person 对象
+val caller = Person.Builder()
+    .setName("张三")
+    .setIcon(Icon.createWithResource(context, R.drawable.ic_person))
+    .setImportant(true)
+    .build()
+
+// 来电通知
+val callStyle = Notification.CallStyle.forIncomingCall(
+    caller,
+    hangupPendingIntent,    // 拒接
+    answerPendingIntent     // 接听
+)
+
+// 通话进行中
+val callStyle = Notification.CallStyle.forOngoingCall(
+    caller,
+    hangupPendingIntent     // 挂断
+)
+
+val builder = Notification.Builder(context, CHANNEL_ID)
+    .setSmallIcon(R.drawable.ic_call)
+    .setCategory(Notification.CATEGORY_CALL)
+    .setStyle(callStyle)
+    .setOngoing(true)
+```
+
+---
+
+## 更多场景示例
+
+### 7. 运动健康记录（计时器 + 进度）
+适用于：跑步、骑行、健身
+
+```kotlin
+val builder = Notification.Builder(context, CHANNEL_ID)
+    .setSmallIcon(R.drawable.ic_running)
+    .setContentTitle("跑步中")
+    .setContentText("2.5km · 150kcal")
+    // 计时器：显示运动时长
+    .setWhen(startTimeMillis)
+    .setShowWhen(true)
+    .setUsesChronometer(true)
+
+val style = Notification.ProgressStyle()
+    .setStyledByProgress(true)
+    .setProgress(50)  // 完成50%
+    .setProgressTrackerIcon(Icon.createWithResource(context, R.drawable.ic_running))
+```
+
+### 8. 打车行程（4阶段分段）
+适用于：滴滴、Uber等网约车
+
+```kotlin
+// 阶段：等待接单 → 司机前往 → 行驶中 → 即将到达
+val style = Notification.ProgressStyle()
+    .setStyledByProgress(true)
+    .setProgress(step * 100 + stepProgress)
+    .addProgressSegment(Segment(100).setColor(Color.GRAY))    // 等待
+    .addProgressSegment(Segment(100).setColor(Color.ORANGE))  // 司机前往
+    .addProgressSegment(Segment(100).setColor(Color.GREEN))   // 行驶中
+    .addProgressSegment(Segment(100).setColor(Color.BLUE))    // 即将到达
+    .setProgressTrackerIcon(carIcon)
+    .setProgressStartIcon(startIcon)
+    .setProgressEndIcon(flagIcon)
+```
+
+### 9. 体育比赛实况（比分 + 阶段进度）
+适用于：足球、篮球比赛
+
+```kotlin
+// 比赛分为：上半场(45) + 中场(10) + 下半场(45) = 100
+val style = Notification.ProgressStyle()
+    .setProgress(matchProgress)
+    .addProgressSegment(Segment(45).setColor(Color.GREEN))   // 上半场
+    .addProgressSegment(Segment(10).setColor(Color.GRAY))    // 中场
+    .addProgressSegment(Segment(45).setColor(Color.BLUE))    // 下半场
+    .setProgressTrackerIcon(soccerIcon)
+    .addProgressPoint(Point(45).setColor(Color.WHITE))  // 上半场结束
+    .addProgressPoint(Point(55).setColor(Color.WHITE))  // 下半场开始
+
+// 比分显示在 chip
+builder.setShortCriticalText("2-1")
+```
+
+---
+
 ## 参考链接
 
 - https://developer.android.com/develop/ui/views/notifications/live-update
@@ -291,3 +385,4 @@ notificationManager.canPostPromotedNotifications()
 - https://developer.android.com/reference/android/app/Notification.ProgressStyle
 - https://developer.android.com/reference/android/app/Notification.ProgressStyle.Segment
 - https://developer.android.com/reference/android/app/Notification.ProgressStyle.Point
+- https://developer.android.com/reference/android/app/Notification.CallStyle

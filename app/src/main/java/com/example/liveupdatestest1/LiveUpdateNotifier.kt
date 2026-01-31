@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Person
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -18,6 +19,10 @@ const val SEGMENTED_NOTIFICATION_ID = 1002
 const val TRAVEL_NOTIFICATION_ID = 1003
 const val PICKUP_CODE_NOTIFICATION_ID = 1004
 const val COUNTDOWN_NOTIFICATION_ID = 1005
+const val CALL_NOTIFICATION_ID = 1006
+const val WORKOUT_NOTIFICATION_ID = 1007
+const val RIDESHARE_NOTIFICATION_ID = 1008
+const val SPORTS_NOTIFICATION_ID = 1009
 
 fun ensureLiveUpdateChannel(context: Context) {
     val manager = context.getSystemService(NotificationManager::class.java)
@@ -414,4 +419,335 @@ fun postCountdownLiveUpdate(
 fun cancelCountdownLiveUpdate(context: Context) {
     val manager = context.getSystemService(NotificationManager::class.java)
     manager.cancel(COUNTDOWN_NOTIFICATION_ID)
+}
+
+/**
+ * 通话通知 - 使用 CallStyle
+ * 这是实时通知支持的另一种样式，适用于：语音通话、视频通话、VoIP
+ * 
+ * @param callerName 来电者姓名
+ * @param isOngoing 是否正在通话中（true=通话中，false=来电中）
+ */
+fun postCallLiveUpdate(
+    context: Context,
+    callerName: String,
+    isOngoing: Boolean
+) {
+    ensureLiveUpdateChannel(context)
+
+    // 创建来电者 Person 对象
+    val caller = Person.Builder()
+        .setName(callerName)
+        .setIcon(Icon.createWithResource(context, R.drawable.ic_person))
+        .setImportant(true)
+        .build()
+
+    // 挂断 Intent
+    val hangupIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_HANGUP"
+    }
+    val hangupPendingIntent = PendingIntent.getActivity(
+        context, 1, hangupIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // 接听 Intent
+    val answerIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_ANSWER"
+    }
+    val answerPendingIntent = PendingIntent.getActivity(
+        context, 2, answerIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // 根据状态创建不同的 CallStyle
+    val callStyle = if (isOngoing) {
+        // 通话进行中
+        Notification.CallStyle.forOngoingCall(caller, hangupPendingIntent)
+    } else {
+        // 来电中
+        Notification.CallStyle.forIncomingCall(caller, hangupPendingIntent, answerPendingIntent)
+    }
+
+    val builder = Notification.Builder(context, LIVE_UPDATE_CHANNEL_ID)
+        .setSmallIcon(R.drawable.ic_call)
+        .setContentTitle(if (isOngoing) "正在通话" else "来电")
+        .setContentText(callerName)
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
+        .setCategory(Notification.CATEGORY_CALL)
+        .setStyle(callStyle)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+        val extras = Bundle()
+        extras.putBoolean("android.requestPromotedOngoing", true)
+        builder.addExtras(extras)
+        builder.setShortCriticalText(if (isOngoing) "通话中" else "来电")
+    }
+
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.notify(CALL_NOTIFICATION_ID, builder.build())
+}
+
+fun cancelCallLiveUpdate(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.cancel(CALL_NOTIFICATION_ID)
+}
+
+/**
+ * 运动健康记录通知 - 计时器 + 进度
+ * 适用于：跑步、骑行、健身等运动记录
+ * 
+ * @param startTimeMillis 运动开始时间（毫秒时间戳）
+ * @param calories 消耗卡路里
+ * @param distance 距离（米）
+ * @param targetDistance 目标距离（米）
+ * @param sportType 运动类型（running/cycling/walking）
+ */
+fun postWorkoutLiveUpdate(
+    context: Context,
+    startTimeMillis: Long,
+    calories: Int,
+    distance: Int,
+    targetDistance: Int,
+    sportType: String = "running"
+) {
+    ensureLiveUpdateChannel(context)
+
+    val sportIcon = when (sportType) {
+        "cycling" -> R.drawable.ic_cycling
+        "walking" -> R.drawable.ic_walking
+        else -> R.drawable.ic_running
+    }
+
+    val sportName = when (sportType) {
+        "cycling" -> "骑行"
+        "walking" -> "步行"
+        else -> "跑步"
+    }
+
+    val distanceKm = distance / 1000f
+    val targetKm = targetDistance / 1000f
+    val progress = ((distance.toFloat() / targetDistance) * 100).toInt().coerceIn(0, 100)
+
+    val builder = Notification.Builder(context, LIVE_UPDATE_CHANNEL_ID)
+        .setSmallIcon(sportIcon)
+        .setContentTitle("$sportName 中")
+        .setContentText("${String.format("%.2f", distanceKm)}km · $calories kcal")
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
+        .setCategory(Notification.CATEGORY_WORKOUT)
+        // 计时器：显示运动时长
+        .setWhen(startTimeMillis)
+        .setShowWhen(true)
+        .setUsesChronometer(true)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+        val style = Notification.ProgressStyle()
+            .setStyledByProgress(true)
+            .setProgress(progress)
+            .setProgressTrackerIcon(Icon.createWithResource(context, sportIcon))
+            // 渐变色：从绿色到蓝色
+            .addProgressSegment(Notification.ProgressStyle.Segment(50).setColor(Color.parseColor("#4CAF50")))
+            .addProgressSegment(Notification.ProgressStyle.Segment(50).setColor(Color.parseColor("#2196F3")))
+            // 目标线
+            .addProgressPoint(Notification.ProgressStyle.Point(100).setColor(Color.parseColor("#FF5722")))
+
+        builder.setStyle(style)
+        
+        val extras = Bundle()
+        extras.putBoolean("android.requestPromotedOngoing", true)
+        builder.addExtras(extras)
+        
+        builder.setShortCriticalText("${String.format("%.1f", distanceKm)}km")
+    } else {
+        builder.setProgress(100, progress, false)
+    }
+
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.notify(WORKOUT_NOTIFICATION_ID, builder.build())
+}
+
+fun cancelWorkoutLiveUpdate(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.cancel(WORKOUT_NOTIFICATION_ID)
+}
+
+/**
+ * 打车行程通知 - 分段进度
+ * 适用于：滴滴、Uber等网约车
+ * 
+ * @param step 当前阶段 0=等待接单 1=司机前往 2=行驶中 3=即将到达
+ * @param stepProgress 当前阶段进度 0-100
+ * @param driverName 司机姓名
+ * @param carPlate 车牌号
+ * @param eta 预计到达时间（分钟）
+ */
+fun postRideshareLiveUpdate(
+    context: Context,
+    step: Int,
+    stepProgress: Int,
+    driverName: String,
+    carPlate: String,
+    eta: Int
+) {
+    ensureLiveUpdateChannel(context)
+
+    val statusText = when (step) {
+        0 -> "正在为您匹配司机..."
+        1 -> "$driverName 正在赶来，预计${eta}分钟到达"
+        2 -> "行驶中，预计${eta}分钟到达目的地"
+        3 -> "即将到达目的地"
+        else -> "行程结束"
+    }
+
+    val builder = Notification.Builder(context, LIVE_UPDATE_CHANNEL_ID)
+        .setSmallIcon(R.drawable.ic_car)
+        .setContentTitle("打车行程 · $carPlate")
+        .setContentText(statusText)
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
+        .setCategory(Notification.CATEGORY_NAVIGATION)
+        .setShowWhen(false)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+        val segmentLength = 100
+        val totalProgress = step * segmentLength + stepProgress
+
+        val style = Notification.ProgressStyle()
+            .setStyledByProgress(true)
+            .setProgress(totalProgress)
+            // 4个阶段
+            .addProgressSegment(Notification.ProgressStyle.Segment(segmentLength).setColor(Color.parseColor("#9E9E9E")))  // 等待
+            .addProgressSegment(Notification.ProgressStyle.Segment(segmentLength).setColor(Color.parseColor("#FF9800")))  // 司机前往
+            .addProgressSegment(Notification.ProgressStyle.Segment(segmentLength).setColor(Color.parseColor("#4CAF50")))  // 行驶中
+            .addProgressSegment(Notification.ProgressStyle.Segment(segmentLength).setColor(Color.parseColor("#2196F3")))  // 即将到达
+            // 追踪器
+            .setProgressTrackerIcon(Icon.createWithResource(context, R.drawable.ic_car))
+            // 起终点
+            .setProgressStartIcon(Icon.createWithResource(context, R.drawable.ic_location))
+            .setProgressEndIcon(Icon.createWithResource(context, R.drawable.ic_flag))
+            // 里程碑
+            .addProgressPoint(Notification.ProgressStyle.Point(100).setColor(Color.WHITE))
+            .addProgressPoint(Notification.ProgressStyle.Point(200).setColor(Color.WHITE))
+            .addProgressPoint(Notification.ProgressStyle.Point(300).setColor(Color.WHITE))
+
+        builder.setStyle(style)
+        
+        val extras = Bundle()
+        extras.putBoolean("android.requestPromotedOngoing", true)
+        builder.addExtras(extras)
+        
+        val chipText = when (step) {
+            0 -> "匹配中"
+            1 -> "${eta}分钟"
+            2 -> "${eta}分钟"
+            3 -> "到达"
+            else -> "完成"
+        }
+        builder.setShortCriticalText(chipText)
+    } else {
+        val total = 400
+        val current = step * 100 + stepProgress
+        builder.setProgress(total, current, false)
+    }
+
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.notify(RIDESHARE_NOTIFICATION_ID, builder.build())
+}
+
+fun cancelRideshareLiveUpdate(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.cancel(RIDESHARE_NOTIFICATION_ID)
+}
+
+/**
+ * 体育比赛实况通知 - 分段进度 + 比分显示
+ * 适用于：足球、篮球、网球等体育比赛
+ * 
+ * @param homeTeam 主队名称
+ * @param awayTeam 客队名称
+ * @param homeScore 主队得分
+ * @param awayScore 客队得分
+ * @param period 当前阶段 0=上半场 1=中场休息 2=下半场 3=比赛结束
+ * @param periodProgress 阶段进度 0-100
+ * @param matchTime 比赛时间显示（如 "45'+2"）
+ */
+fun postSportsLiveUpdate(
+    context: Context,
+    homeTeam: String,
+    awayTeam: String,
+    homeScore: Int,
+    awayScore: Int,
+    period: Int,
+    periodProgress: Int,
+    matchTime: String
+) {
+    ensureLiveUpdateChannel(context)
+
+    val periodName = when (period) {
+        0 -> "上半场"
+        1 -> "中场休息"
+        2 -> "下半场"
+        3 -> "比赛结束"
+        else -> "进行中"
+    }
+
+    val builder = Notification.Builder(context, LIVE_UPDATE_CHANNEL_ID)
+        .setSmallIcon(R.drawable.ic_sports)
+        .setContentTitle("$homeTeam $homeScore - $awayScore $awayTeam")
+        .setContentText("$periodName · $matchTime")
+        .setOngoing(period < 3)  // 比赛结束后不再 ongoing
+        .setOnlyAlertOnce(true)
+        .setCategory(Notification.CATEGORY_EVENT)
+        .setShowWhen(false)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+        // 比赛分为：上半场(45) + 中场(10) + 下半场(45) = 100
+        val totalProgress = when (period) {
+            0 -> (periodProgress * 45 / 100)           // 上半场 0-45
+            1 -> 45 + (periodProgress * 10 / 100)      // 中场 45-55
+            2 -> 55 + (periodProgress * 45 / 100)      // 下半场 55-100
+            else -> 100
+        }
+
+        val style = Notification.ProgressStyle()
+            .setStyledByProgress(true)
+            .setProgress(totalProgress)
+            // 上半场 - 绿色
+            .addProgressSegment(Notification.ProgressStyle.Segment(45).setColor(Color.parseColor("#4CAF50")))
+            // 中场休息 - 灰色
+            .addProgressSegment(Notification.ProgressStyle.Segment(10).setColor(Color.parseColor("#9E9E9E")))
+            // 下半场 - 蓝色
+            .addProgressSegment(Notification.ProgressStyle.Segment(45).setColor(Color.parseColor("#2196F3")))
+            // 追踪器图标（足球）
+            .setProgressTrackerIcon(Icon.createWithResource(context, R.drawable.ic_sports))
+            // 中场标记点
+            .addProgressPoint(Notification.ProgressStyle.Point(45).setColor(Color.WHITE))
+            .addProgressPoint(Notification.ProgressStyle.Point(55).setColor(Color.WHITE))
+
+        builder.setStyle(style)
+        
+        val extras = Bundle()
+        extras.putBoolean("android.requestPromotedOngoing", true)
+        builder.addExtras(extras)
+        
+        // 比分作为 chip 显示
+        builder.setShortCriticalText("$homeScore-$awayScore")
+    } else {
+        builder.setProgress(100, when (period) {
+            0 -> periodProgress / 2
+            1 -> 50
+            2 -> 50 + periodProgress / 2
+            else -> 100
+        }, false)
+    }
+
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.notify(SPORTS_NOTIFICATION_ID, builder.build())
+}
+
+fun cancelSportsLiveUpdate(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.cancel(SPORTS_NOTIFICATION_ID)
 }

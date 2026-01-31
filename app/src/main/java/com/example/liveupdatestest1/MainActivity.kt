@@ -341,9 +341,254 @@ fun LiveUpdatesScreen(modifier: Modifier = Modifier) {
             Text(text = "取消倒计时通知")
         }
 
+        HorizontalDivider()
+
+        // === 通话通知（CallStyle） ===
+        val isOngoingCall = remember { mutableStateOf(false) }
+        Text(text = "📞 通话通知（CallStyle）")
+        Text(text = "状态：${if (isOngoingCall.value) "通话中" else "待机"}")
+
+        Button(onClick = {
+            isOngoingCall.value = false
+            postCallLiveUpdate(context, "张三", false)
+        }) {
+            Text(text = "模拟来电")
+        }
+
+        Button(onClick = {
+            isOngoingCall.value = true
+            postCallLiveUpdate(context, "张三", true)
+        }) {
+            Text(text = "接听（通话中）")
+        }
+
+        Button(onClick = {
+            isOngoingCall.value = false
+            cancelCallLiveUpdate(context)
+        }) {
+            Text(text = "挂断")
+        }
+
+        HorizontalDivider()
+
+        // === 运动健康通知 ===
+        val workoutStartTime = remember { mutableStateOf(0L) }
+        val workoutDistance = remember { mutableIntStateOf(0) }
+        val workoutCalories = remember { mutableIntStateOf(0) }
+        Text(text = "🏃 运动健康通知")
+        Text(text = "距离：${workoutDistance.intValue / 1000f}km · 卡路里：${workoutCalories.intValue}kcal")
+
+        Button(onClick = {
+            workoutStartTime.value = System.currentTimeMillis()
+            workoutDistance.intValue = 0
+            workoutCalories.intValue = 0
+            postWorkoutLiveUpdate(
+                context,
+                startTimeMillis = workoutStartTime.value,
+                calories = 0,
+                distance = 0,
+                targetDistance = 5000,
+                sportType = "running"
+            )
+        }) {
+            Text(text = "开始跑步（目标5km）")
+        }
+
+        Button(onClick = {
+            workoutDistance.intValue += 500
+            workoutCalories.intValue += 35
+            postWorkoutLiveUpdate(
+                context,
+                startTimeMillis = workoutStartTime.value,
+                calories = workoutCalories.intValue,
+                distance = workoutDistance.intValue,
+                targetDistance = 5000,
+                sportType = "running"
+            )
+        }) {
+            Text(text = "跑了500米（+35kcal）")
+        }
+
+        Button(onClick = {
+            cancelWorkoutLiveUpdate(context)
+        }) {
+            Text(text = "结束运动")
+        }
+
+        HorizontalDivider()
+
+        // === 打车行程通知 ===
+        val rideshareStep = remember { mutableIntStateOf(0) }
+        val rideshareProgress = remember { mutableIntStateOf(0) }
+        val rideshareEta = remember { mutableIntStateOf(15) }
+        Text(text = "🚕 打车行程通知")
+        val rideshareStatus = when (rideshareStep.intValue) {
+            0 -> "等待接单"
+            1 -> "司机前往"
+            2 -> "行驶中"
+            3 -> "即将到达"
+            else -> "已完成"
+        }
+        Text(text = "阶段：$rideshareStatus · 预计${rideshareEta.intValue}分钟")
+
+        Button(onClick = {
+            rideshareStep.intValue = 0
+            rideshareProgress.intValue = 0
+            rideshareEta.intValue = 15
+            postRideshareLiveUpdate(context, 0, 0, "王师傅", "京A·12345", 15)
+        }) {
+            Text(text = "呼叫打车")
+        }
+
+        Button(onClick = {
+            rideshareProgress.intValue += 30
+            if (rideshareProgress.intValue >= 100) {
+                if (rideshareStep.intValue < 3) {
+                    rideshareStep.intValue += 1
+                    rideshareProgress.intValue = 0
+                    rideshareEta.intValue = (rideshareEta.intValue - 3).coerceAtLeast(1)
+                } else {
+                    rideshareProgress.intValue = 100
+                }
+            }
+            postRideshareLiveUpdate(
+                context,
+                rideshareStep.intValue,
+                rideshareProgress.intValue,
+                "王师傅",
+                "京A·12345",
+                rideshareEta.intValue
+            )
+        }) {
+            Text(text = "推进行程 +30%")
+        }
+
+        Button(onClick = {
+            if (rideshareStep.intValue < 3) {
+                rideshareStep.intValue += 1
+                rideshareProgress.intValue = 0
+                rideshareEta.intValue = (rideshareEta.intValue - 3).coerceAtLeast(1)
+                postRideshareLiveUpdate(
+                    context,
+                    rideshareStep.intValue,
+                    rideshareProgress.intValue,
+                    "王师傅",
+                    "京A·12345",
+                    rideshareEta.intValue
+                )
+            }
+        }) {
+            Text(text = "跳到下一阶段")
+        }
+
+        Button(onClick = {
+            cancelRideshareLiveUpdate(context)
+        }) {
+            Text(text = "结束行程")
+        }
+
+        HorizontalDivider()
+
+        // === 体育比赛实况通知 ===
+        val sportsPeriod = remember { mutableIntStateOf(0) }
+        val sportsProgress = remember { mutableIntStateOf(0) }
+        val homeScore = remember { mutableIntStateOf(0) }
+        val awayScore = remember { mutableIntStateOf(0) }
+        Text(text = "⚽ 体育比赛实况")
+        val periodName = when (sportsPeriod.intValue) {
+            0 -> "上半场"
+            1 -> "中场休息"
+            2 -> "下半场"
+            else -> "比赛结束"
+        }
+        Text(text = "曼联 ${homeScore.intValue} - ${awayScore.intValue} 利物浦 · $periodName")
+
+        Button(onClick = {
+            sportsPeriod.intValue = 0
+            sportsProgress.intValue = 0
+            homeScore.intValue = 0
+            awayScore.intValue = 0
+            postSportsLiveUpdate(
+                context, "曼联", "利物浦",
+                0, 0, 0, 0, "0'"
+            )
+        }) {
+            Text(text = "开始比赛")
+        }
+
+        Button(onClick = {
+            sportsProgress.intValue += 20
+            if (sportsProgress.intValue >= 100) {
+                if (sportsPeriod.intValue < 3) {
+                    sportsPeriod.intValue += 1
+                    sportsProgress.intValue = 0
+                }
+            }
+            // 随机进球
+            if ((0..10).random() > 7) {
+                if ((0..1).random() == 0) homeScore.intValue++ else awayScore.intValue++
+            }
+            val matchTime = when (sportsPeriod.intValue) {
+                0 -> "${sportsProgress.intValue * 45 / 100}'"
+                1 -> "HT"
+                2 -> "${45 + sportsProgress.intValue * 45 / 100}'"
+                else -> "FT"
+            }
+            postSportsLiveUpdate(
+                context, "曼联", "利物浦",
+                homeScore.intValue, awayScore.intValue,
+                sportsPeriod.intValue, sportsProgress.intValue,
+                matchTime
+            )
+        }) {
+            Text(text = "推进比赛 +20%")
+        }
+
+        Button(onClick = {
+            homeScore.intValue++
+            val matchTime = when (sportsPeriod.intValue) {
+                0 -> "${sportsProgress.intValue * 45 / 100}'"
+                1 -> "HT"
+                2 -> "${45 + sportsProgress.intValue * 45 / 100}'"
+                else -> "FT"
+            }
+            postSportsLiveUpdate(
+                context, "曼联", "利物浦",
+                homeScore.intValue, awayScore.intValue,
+                sportsPeriod.intValue, sportsProgress.intValue,
+                matchTime
+            )
+        }) {
+            Text(text = "曼联进球！")
+        }
+
+        Button(onClick = {
+            awayScore.intValue++
+            val matchTime = when (sportsPeriod.intValue) {
+                0 -> "${sportsProgress.intValue * 45 / 100}'"
+                1 -> "HT"
+                2 -> "${45 + sportsProgress.intValue * 45 / 100}'"
+                else -> "FT"
+            }
+            postSportsLiveUpdate(
+                context, "曼联", "利物浦",
+                homeScore.intValue, awayScore.intValue,
+                sportsPeriod.intValue, sportsProgress.intValue,
+                matchTime
+            )
+        }) {
+            Text(text = "利物浦进球！")
+        }
+
+        Button(onClick = {
+            cancelSportsLiveUpdate(context)
+        }) {
+            Text(text = "结束比赛通知")
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = "提示：Android 16 上会以 Live Updates 方式展示，分段通知会显示不同颜色的进度条。")
-        Text(text = "新增：取餐码使用 BigTextStyle（无进度条），倒计时使用 chronometer。")
+        Text(text = "新增：取餐码使用 BigTextStyle，倒计时使用 chronometer，通话使用 CallStyle。")
     }
 }
 
