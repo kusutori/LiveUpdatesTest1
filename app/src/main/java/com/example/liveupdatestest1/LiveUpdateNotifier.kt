@@ -425,6 +425,13 @@ fun cancelCountdownLiveUpdate(context: Context) {
  * 通话通知 - 使用 CallStyle
  * 这是实时通知支持的另一种样式，适用于：语音通话、视频通话、VoIP
  * 
+ * 注意：CallStyle 通知有特殊要求，必须满足以下条件之一：
+ * 1. 来自前台服务 (Foreground Service)
+ * 2. 来自用户发起的任务 (User-initiated Job)
+ * 3. 使用 fullScreenIntent
+ * 
+ * 这里使用 fullScreenIntent 来满足要求
+ * 
  * @param callerName 来电者姓名
  * @param isOngoing 是否正在通话中（true=通话中，false=来电中）
  */
@@ -445,6 +452,7 @@ fun postCallLiveUpdate(
     // 挂断 Intent
     val hangupIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_HANGUP"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
     val hangupPendingIntent = PendingIntent.getActivity(
         context, 1, hangupIntent,
@@ -454,9 +462,20 @@ fun postCallLiveUpdate(
     // 接听 Intent
     val answerIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_ANSWER"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
     val answerPendingIntent = PendingIntent.getActivity(
         context, 2, answerIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // 全屏 Intent - CallStyle 必需
+    val fullScreenIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_INCOMING_CALL"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    }
+    val fullScreenPendingIntent = PendingIntent.getActivity(
+        context, 3, fullScreenIntent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
@@ -477,6 +496,8 @@ fun postCallLiveUpdate(
         .setOnlyAlertOnce(true)
         .setCategory(Notification.CATEGORY_CALL)
         .setStyle(callStyle)
+        // CallStyle 必须设置 fullScreenIntent
+        .setFullScreenIntent(fullScreenPendingIntent, true)
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
         val extras = Bundle()
